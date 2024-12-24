@@ -7,19 +7,23 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 
 
-def search_wikipedia(query):
-    # Убедитесь, что у вас установлен geckodriver в PATH или укажите путь к нему
-    driver = webdriver.Firefox()
-    driver.get("https://ru.wikipedia.org/wiki/Основная_страница")
-    search_box = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.ID, "searchInput"))
-    )
-    search_box.send_keys(query)
-    search_box.send_keys(Keys.ENTER)
-    link = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.LINK_TEXT, query))
-    )
-    link.click()
+def search_wikipedia(query, driver, searched_url):
+    if searched_url == "":
+        print("Открываем основную страницу...")
+        driver.get("https://ru.wikipedia.org/wiki/Основная_страница")
+        search_box = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "searchInput"))
+        )
+        search_box.send_keys(query)
+        search_box.send_keys(Keys.ENTER)
+        print("Ищем подхоящий материал...")
+        link = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.LINK_TEXT, query))
+        )
+        link.click()
+    else:
+        driver.get(searched_url)
+
     WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.TAG_NAME, "p"))
     )
@@ -37,38 +41,48 @@ def scroll_paragraphs(driver):
             break
 
 
-def navigate_links(driver):
-    # links = driver.find_elements(By.CSS_SELECTOR, "div.hatnote.navigation-not-searchable a")
-    # for element in :
-    #     # Чтобы искать атрибут класса
-    #     css_class = element.get.attribute("class")
-    #     if css_class == "hatnote navigation-not-searchable":
-    #         hatnotes.append(element)
-    #
-    # # print(hatnotes)
-    # hatnote = random.choice(hatnotes)
-    #
-    # # Для получения ссылки мы должны найти на сайте тег "a" внутри тега "div"
-    # link = hatnote.find_element(By.TAG_NAME, "a").get.attribute("href")
-    # browser.get(link)
-
+def navigate_links(driver, searched_url):
     links = driver.find_elements(By.CSS_SELECTOR, "div.hatnote.navigation-not-searchable.ts-main a")
-    for i, link in enumerate(links[:9], 1):  # Ограничиваем до 9 ссылок для примера
-        print(f"{i}. {link.text}")
 
-    choice = input("Выберите номер ссылки или 'q' для выхода: ")
-    if choice.lower() != 'q':
-        link = links[int(choice) - 1]
-        driver.get(link.get_attribute('href'))
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.TAG_NAME, "p"))
-        )
-        print("Статья открылась!")
+    while True:
+        for i, link in enumerate(links[:9], 1):  # Ограничиваем до 9 ссылок для примера
+            print(f"{i}. {link.text}")
+        choice = input("Выберите номер ссылки или 'q' для возврата: ")
+        if choice.lower() == 'q':
+            return
+
+        try:
+            link = links[int(choice) - 1]
+            driver.get(link.get_attribute('href'))
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.TAG_NAME, "p"))
+            )
+            print("Статья открылась!")
+            break
+        except (ValueError, IndexError):
+            print("Неверный выбор. Попробуйте снова.")
+
+    while True:
+        print("\n1. Листать параграфы текущей связанной статьи")
+        print("2. Перейти к основной статье")
+        action_choice = input("Выберите действие: ")
+        if action_choice == '1':
+            scroll_paragraphs(driver)
+        elif action_choice == '2':
+            search_wikipedia("", driver, searched_url)
+            return
+        else:
+            print("Неверный выбор. Попробуйте снова.")
 
 
 def main():
+    searched_url = ""
     query = input("Введите запрос для поиска в Википедии: ")
-    driver = search_wikipedia(query)
+
+    print("Открываем браузер...")
+    # Убедитесь, что у вас установлен geckodriver в PATH или укажите путь к нему
+    driver = search_wikipedia(query, webdriver.Firefox(), searched_url)
+    searched_url = driver.current_url
 
     while True:
         print("\n1. Листать параграфы текущей статьи")
@@ -79,7 +93,7 @@ def main():
         if choice == '1':
             scroll_paragraphs(driver)
         elif choice == '2':
-            navigate_links(driver)
+            navigate_links(driver, searched_url)
         elif choice == '3':
             driver.quit()
             break
